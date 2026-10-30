@@ -97,6 +97,9 @@ main { padding-block: 16px 40px; display: flex; flex-direction: column; gap: 16p
 .wa { align-self: flex-start; display: inline-flex; gap: 8px; align-items: center; font-weight: 800; text-decoration: none; color: #FFFFFF; background: #1F6A2F; padding: 9px 14px; border-radius: 10px; }
 .wa svg { width: 18px; height: 18px; }
 .extra { background: var(--soft); border-radius: 10px; padding: 12px 14px; font-size: 0.92rem; }
+.mudou { margin-top: 12px; background: var(--laranja-bg); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.mudou p { margin: 0; line-height: 1.5; max-width: 62ch; }
+.mudou .btn { text-decoration: none; }
 .guardar { display: flex; flex-direction: column; gap: 10px; margin: 14px 0 18px; }
 .guardar p { margin: 0; line-height: 1.5; max-width: 70ch; }
 .cod-box { width: 100%; font: inherit; font-size: 0.85rem; border-radius: 10px; border: 1.5px solid var(--line); background: var(--panel); color: var(--ink); padding: 10px; overflow-wrap: anywhere; }
@@ -121,6 +124,10 @@ footer.foot a { color: inherit; }
     <p class="sub">72ª Feira do Livro de Porto Alegre · 30/10 a 15/11 · Praça da Alfândega</p>
     <p class="by">Um guia de <a href="https://maiaraalvarez.com" target="_blank" rel="noopener">Maiara Alvarez</a>, produtora editorial · <a href="https://www.instagram.com/maiara_pohka/" target="_blank" rel="noopener">@maiara_pohka</a></p>
     <p class="note" id="fonte">Este é um guia independente, não é o site oficial da Feira. A programação é atualizada de acordo com o site oficial da FLPoA (e atualizada diariamente), além de alguns eventos que nos foram informados diretamente. Confira sempre a página oficial da Feira de cada atividade antes de ir.</p>
+    <div class="mudou" id="mudou" hidden>
+      <p><b>O roteiro mudou de endereço.</b> A versão nova fica em flpoa.maiaraalvarez.com e guarda a sua agenda direitinho em qualquer celular. Toque no botão para abrir a versão nova já com as atividades que você salvou aqui.</p>
+      <a class="btn" id="levar" href="https://flpoa.maiaraalvarez.com/#agenda" target="_blank" rel="noopener">Levar minha agenda para o novo endereço</a>
+    </div>
   </header>
 </div>
 
@@ -383,7 +390,7 @@ footer.foot a { color: inherit; }
   function renderAgenda() {
     const list = savedList();
     const box = $('agenda-list');
-    if (!list.length) { box.replaceChildren(); const e = document.createElement('div'); e.className = 'empty'; e.innerHTML = '<p><b>Sua agenda está vazia.</b></p><p>Na Programação ou nos Filhotes da Póka, toque em Salvar nas atividades que quer ver.</p>'; box.appendChild(e); return; }
+    if (!list.length) { box.replaceChildren(); const e = document.createElement('div'); e.className = 'empty'; e.innerHTML = '<p><b>Sua agenda está vazia.</b></p><p>Na Programação ou nos Filhotes da Póka, toque em Salvar nas atividades que quer ver.</p>' + (IN_CLAUDE ? '' : '<p>Já tinha salvo atividades antes de 31/10? Abra o <a href="https://claude.ai/artifact/SerK5pcNFAuJj1koJpYF2G" target="_blank" rel="noopener">roteiro no endereço antigo</a> e toque em “Levar minha agenda para o novo endereço”.</p>'); box.appendChild(e); return; }
     const clash = new Map();
     list.forEach((a, i) => list.forEach((b, j) => { if (i !== j && a.d === b.d && toMin(a.s) < endMin(b) && toMin(b.s) < endMin(a)) { clash.set(a.i, 'No mesmo horário de outra atividade salva'); } }));
     groupByDay(list, box, { clash });
@@ -537,7 +544,14 @@ footer.foot a { color: inherit; }
   // recebe a agenda como imagem, que dá para salvar segurando o dedo nela.
   let canDownload = null;
   DL.then((dl) => { canDownload = !!dl; if (!dl && IN_CLAUDE) $('pdf').textContent = 'Salvar como imagem'; });
-  if (!IN_CLAUDE) { const s = document.getElementById('nota-iphone'); if (s) s.hidden = true; }
+  if (!IN_CLAUDE) { const s = document.getElementById('nota-iphone'); if (s) s.hidden = true; const g = document.querySelector('.guardar'); if (g) g.hidden = true; }
+  // Mudança de endereço: ligue MIGRADO quando flpoa.maiaraalvarez.com já abrir a versão do GitHub.
+  const MIGRADO = false;
+  const NOVO = 'https://flpoa.maiaraalvarez.com/';
+  if (IN_CLAUDE && MIGRADO) {
+    $('mudou').hidden = false;
+    $('levar').addEventListener('click', () => { const ids = [...SAVED].filter((i) => BYID.has(i)); $('levar').href = NOVO + (ids.length ? '?agenda=' + ids.join('.') : '') + '#agenda'; });
+  }
   function agendaImages() {
     const PW = 1240, PH = 1754, M = 96, X2 = M + 140;
     const F = '"AHN", system-ui, sans-serif';
@@ -636,9 +650,20 @@ footer.foot a { color: inherit; }
       const [y, m, d] = (j.atualizado || '').split('-');
       $('atualizado').textContent = j.atualizado ? `Programação copiada do site da Feira em ${d}/${m}/${y}.` : '';
       buildFilters();
-      const h = location.hash.slice(1);
+      let importadas = -1;
+      if (!IN_CLAUDE) {
+        const q = new URLSearchParams(location.search).get('agenda');
+        if (q !== null) {
+          const ids = (q.match(/[0-9a-f]{7}/gi) || []).map((x) => x.toLowerCase()).filter((x) => BYID.has(x));
+          const antes = SAVED.size; ids.forEach((x) => SAVED.add(x)); persist(); importadas = SAVED.size - antes;
+          try { history.replaceState(null, '', location.pathname + '#agenda'); } catch (e) {}
+        }
+      }
+      const h = importadas >= 0 ? 'agenda' : location.hash.slice(1);
       renderAll();
       if (TABS.includes(h)) showTab(h);
+      if (importadas > 0) $('copiar-status').textContent = `Pronto! ${importadas} ${importadas === 1 ? 'atividade veio' : 'atividades vieram'} do endereço antigo.`;
+      else if (importadas === 0) $('copiar-status').textContent = 'Sua agenda já estava aqui.';
     } catch (e) {
       $('count').textContent = 'Não consegui carregar a programação agora. Recarregue a página em instantes.';
     }
