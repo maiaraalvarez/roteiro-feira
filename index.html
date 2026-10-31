@@ -546,7 +546,7 @@ footer.foot a { color: inherit; }
   DL.then((dl) => { canDownload = !!dl; if (!dl && IN_CLAUDE) $('pdf').textContent = 'Salvar como imagem'; });
   if (!IN_CLAUDE) { const s = document.getElementById('nota-iphone'); if (s) s.hidden = true; const g = document.querySelector('.guardar'); if (g) g.hidden = true; }
   // Mudança de endereço: ligue MIGRADO quando flpoa.maiaraalvarez.com já abrir a versão do GitHub.
-  const MIGRADO = false;
+  const MIGRADO = true;
   const NOVO = 'https://flpoa.maiaraalvarez.com/';
   if (IN_CLAUDE && MIGRADO) {
     $('mudou').hidden = false;
