@@ -634,6 +634,13 @@ footer.foot a { color: inherit; }
     const mk = (label, val, box, key) => { const c = document.createElement('button'); c.type = 'button'; c.className = 'chip'; c.dataset[key] = val; c.textContent = label; return c; };
     const all = mk('Todos os dias', '', dbox, 'day'); all.setAttribute('aria-pressed', 'true'); dbox.appendChild(all);
     days.forEach((d) => { const i = dayInfo(d); const c = mk('', d, dbox, 'day'); c.textContent = `${WD[i.wd]} ${i.label}`; c.setAttribute('aria-pressed', 'false'); dbox.appendChild(c); });
+    // Abre no dia de hoje, se hoje for dia de Feira
+    const hoje = nowSP().d;
+    const chipHoje = [...dbox.querySelectorAll('.chip')].find((c) => c.dataset.day === hoje);
+    if (chipHoje) {
+      state.day = hoje; all.setAttribute('aria-pressed', 'false'); chipHoje.setAttribute('aria-pressed', 'true');
+      requestAnimationFrame(() => { dbox.scrollLeft = Math.max(0, chipHoje.offsetLeft - dbox.offsetLeft - 16); });
+    }
     dbox.addEventListener('click', (e) => { const c = e.target.closest('.chip'); if (!c) return; state.day = c.dataset.day; state.shown = PAGE; dbox.querySelectorAll('.chip').forEach((x) => x.setAttribute('aria-pressed', x === c ? 'true' : 'false')); renderList(); });
     const sel = $('tipo');
     CATS.forEach((ct) => { const n = DATA.filter((a) => a.c === ct.k).length; if (!n) return; const o = document.createElement('option'); o.value = ct.k; o.textContent = `${ct.label} (${n})`; sel.appendChild(o); });
