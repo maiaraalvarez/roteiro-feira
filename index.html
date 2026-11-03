@@ -78,6 +78,14 @@ main { padding-block: 16px 40px; display: flex; flex-direction: column; gap: 16p
 .save[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
 .save[aria-pressed="true"] svg { fill: currentColor; }
 .lnk { font-size: 0.86rem; color: var(--ink); text-underline-offset: 3px; }
+.share { font: inherit; font-size: 0.86rem; color: var(--ink); background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; display: inline-flex; gap: 5px; align-items: center; }
+.share svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.card.alvo { outline: 3px solid var(--accent); outline-offset: 2px; }
+.card { scroll-margin-top: 120px; }
+.toast { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 18px); transform: translateX(-50%); width: min(92vw, 440px); background: var(--ink); color: var(--bg); border-radius: 12px; padding: 12px 16px; font-size: 0.92rem; line-height: 1.4; z-index: 20; box-shadow: 0 6px 24px rgba(0,0,0,.25); display: flex; flex-direction: column; gap: 8px; }
+.toast[hidden] { display: none; }
+.toast textarea { width: 100%; min-height: 8rem; font: inherit; font-size: 0.85rem; border-radius: 8px; border: 0; padding: 8px; color: #1F1A17; background: #fff; }
+.toast button { align-self: flex-end; font: inherit; font-weight: 700; font-size: 0.85rem; background: transparent; color: inherit; border: 1.5px solid currentColor; border-radius: 8px; padding: 4px 10px; cursor: pointer; }
 .note { font-size: 0.82rem; font-weight: 600; color: var(--ink); margin: 0; padding-left: 8px; border-left: 3px solid var(--accent); }
 .clash { font-size: 0.8rem; font-weight: 600; color: var(--warn); margin: 0; }
 .showmore { font: inherit; font-weight: 600; padding: 12px; border-radius: 12px; border: 1.5px dashed var(--line); background: transparent; color: var(--ink); cursor: pointer; }
@@ -302,10 +310,46 @@ footer.foot a { color: inherit; }
 
   const STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z" stroke-linejoin="round"/></svg>';
 
+  const SHARE = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V3M7 8l5-5 5 5M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>';
+
+  // Compartilhar um evento: texto pronto + link direto (?evento=id)
+  function shareText(a) {
+    const i = dayInfo(a.d);
+    const what = a.c === 'Autógrafos' ? `Autógrafos: ${a.t}${a.a ? ', de ' + a.a : ''}` : a.t;
+    const lines = [`*${what}*`];
+    if (a.a && a.c !== 'Autógrafos') lines.push('👤 ' + a.a + (a.p ? ' · ' + a.p : ''));
+    else if (a.p) lines.push('📚 ' + a.p);
+    lines.push(`📅 ${WDL[i.wd]}, ${i.label}, ${a.e ? 'das ' + hShort(a.s) + ' às ' + hShort(a.e) : 'às ' + hShort(a.s)}`);
+    if (a.l) lines.push('📍 ' + a.l);
+    if (a.n) lines.push('ℹ️ ' + a.n);
+    lines.push('', '72ª Feira do Livro de Porto Alegre. Veja no roteiro:', 'https://flpoa.maiaraalvarez.com/?evento=' + a.i);
+    return lines.join('\n');
+  }
+  let toastT;
+  function toast(msg, texto) {
+    let t = $('toast');
+    if (!t) { t = document.createElement('div'); t.id = 'toast'; t.className = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+    clearTimeout(toastT); t.replaceChildren(); t.hidden = false;
+    const p = document.createElement('div'); p.textContent = msg; t.appendChild(p);
+    if (texto) { const ta = document.createElement('textarea'); ta.readOnly = true; ta.value = texto; t.appendChild(ta); setTimeout(() => { ta.focus(); ta.select(); }, 30); }
+    const x = document.createElement('button'); x.type = 'button'; x.textContent = 'Fechar'; x.addEventListener('click', () => { t.hidden = true; }); t.appendChild(x);
+    if (!texto) toastT = setTimeout(() => { t.hidden = true; }, 4500);
+  }
+  async function shareEvent(a) {
+    const txt = shareText(a);
+    const touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+    if (touch && navigator.share) {
+      try { await navigator.share({ text: txt }); return; }
+      catch (e) { if (e && e.name === 'AbortError') return; }
+    }
+    try { await navigator.clipboard.writeText(txt); toast('Evento copiado. É só colar no WhatsApp ou onde quiser.'); }
+    catch (e) { toast('Copie o texto abaixo e cole no WhatsApp ou onde quiser:', txt); }
+  }
+
   function card(a, extra) {
     const cat = catOf(a.c);
     const el = document.createElement('article');
-    el.className = 'card ' + cat.cls;
+    el.className = 'card ' + cat.cls; el.dataset.ev = a.i;
     const time = document.createElement('div'); time.className = 'time';
     time.textContent = hShort(a.s);
     if (a.e) { const sm = document.createElement('small'); sm.textContent = 'até ' + hShort(a.e); time.appendChild(sm); }
@@ -325,6 +369,7 @@ footer.foot a { color: inherit; }
     sv.setAttribute('aria-label', (on ? 'Remover da minha agenda: ' : 'Salvar na minha agenda: ') + a.t);
     act.appendChild(sv);
     const g = document.createElement('a'); g.className = 'lnk'; g.href = gcalUrl(a); g.target = '_blank'; g.rel = 'noopener'; g.textContent = 'Google Agenda'; act.appendChild(g);
+    const sh = document.createElement('button'); sh.type = 'button'; sh.className = 'share'; sh.dataset.share = a.i; sh.innerHTML = SHARE; const shl = document.createElement('span'); shl.textContent = 'Compartilhar'; sh.appendChild(shl); sh.setAttribute('aria-label', 'Compartilhar: ' + a.t); act.appendChild(sh);
     if (a.u) { const o = document.createElement('a'); o.className = 'lnk'; o.href = a.u; o.target = '_blank'; o.rel = 'noopener'; o.textContent = a.k ? 'Ver no site da Feira' : 'Página oficial'; act.appendChild(o); }
     body.appendChild(act);
     el.append(time, body);
@@ -445,6 +490,12 @@ footer.foot a { color: inherit; }
     try { history.replaceState(null, '', '#' + name); } catch (e) {}
   }
   document.querySelectorAll('.tab').forEach((b) => b.addEventListener('click', () => { showTab(b.dataset.tab); window.scrollTo({ top: document.querySelector('.tabs').offsetTop, behavior: 'auto' }); }));
+
+  // Compartilhar (delegado)
+  document.addEventListener('click', (ev) => {
+    const b = ev.target.closest('.share'); if (!b) return;
+    const a = BYID.get(b.dataset.share); if (a) shareEvent(a);
+  });
 
   // Salvar (delegado)
   document.addEventListener('click', (ev) => {
@@ -666,9 +717,31 @@ footer.foot a { color: inherit; }
           try { history.replaceState(null, '', location.pathname + '#agenda'); } catch (e) {}
         }
       }
-      const h = importadas >= 0 ? 'agenda' : location.hash.slice(1);
+      // Link de evento compartilhado: abre a Programação no dia dele, com o evento em destaque
+      let alvo = null, alvoPerdido = false;
+      if (!IN_CLAUDE && importadas < 0) {
+        const ev = new URLSearchParams(location.search).get('evento');
+        if (ev !== null) {
+          alvo = BYID.get(ev.toLowerCase().trim()) || null; alvoPerdido = !alvo;
+          try { history.replaceState(null, '', location.pathname + '#programacao'); } catch (e) {}
+          if (alvo) {
+            state.day = alvo.d;
+            $('days').querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', c.dataset.day === alvo.d ? 'true' : 'false'));
+            const chip = $('days').querySelector(`.chip[data-day="${alvo.d}"]`);
+            if (chip) requestAnimationFrame(() => { $('days').scrollLeft = Math.max(0, chip.offsetLeft - $('days').offsetLeft - 16); });
+            const pos = DATA.filter(matches).indexOf(alvo);
+            if (pos >= state.shown) state.shown = Math.ceil((pos + 1) / PAGE) * PAGE;
+          }
+        }
+      }
+      const h = importadas >= 0 ? 'agenda' : (alvo || alvoPerdido) ? 'programacao' : location.hash.slice(1);
       renderAll();
       if (TABS.includes(h)) showTab(h);
+      if (alvo) {
+        const el = document.querySelector(`#list .card[data-ev="${alvo.i}"]`);
+        if (el) { el.classList.add('alvo'); requestAnimationFrame(() => el.scrollIntoView({ block: 'center' })); setTimeout(() => el.classList.remove('alvo'), 8000); }
+      }
+      if (alvoPerdido) toast('Esse evento não está mais na programação: pode ter sido cancelado ou alterado. Confira as atividades do dia.');
       if (importadas > 0) $('copiar-status').textContent = `Pronto! ${importadas} ${importadas === 1 ? 'atividade veio' : 'atividades vieram'} do endereço antigo.`;
       else if (importadas === 0) $('copiar-status').textContent = 'Sua agenda já estava aqui.';
     } catch (e) {
