@@ -274,7 +274,10 @@ footer.foot a { color: inherit; }
   const STORE = 'roteiro-flpoa-2026';
 
   let DATA = [], BYID = new Map(), FILHOTES = [], SAVED = new Set();
-  const state = { q: '', day: '', tipo: '', periodo: '', shown: PAGE };
+  const state = { q: '', day: '', tipo: '', periodo: '', shown: PAGE, autoDay: false };
+  // Dia aberto automaticamente (hoje): uma busca procura em todos os dias; um dia escolhido pela pessoa continua valendo na busca.
+  const diaAtivo = () => (state.q && state.autoDay ? '' : state.day);
+  function marcarDia() { const d = diaAtivo(); document.querySelectorAll('#days .chip').forEach((c) => c.setAttribute('aria-pressed', c.dataset.day === d ? 'true' : 'false')); }
 
   const $ = (id) => document.getElementById(id);
   const norm = (s) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -392,7 +395,7 @@ footer.foot a { color: inherit; }
   }
 
   function matches(a) {
-    if (state.day && a.d !== state.day) return false;
+    const dia = diaAtivo(); if (dia && a.d !== dia) return false;
     if (state.tipo && a.c !== state.tipo) return false;
     if (state.periodo) { const m = toMin(a.s); if (state.periodo === 'm' && m >= 720) return false; if (state.periodo === 't' && (m < 720 || m >= 1080)) return false; if (state.periodo === 'n' && m < 1080) return false; }
     if (state.q) { const words = norm(state.q).split(/\s+/).filter(Boolean); return words.every((w) => a._s.includes(w)); }
@@ -509,11 +512,11 @@ footer.foot a { color: inherit; }
 
   // Filtros
   let qt;
-  $('q').addEventListener('input', (e) => { clearTimeout(qt); qt = setTimeout(() => { state.q = e.target.value.trim(); state.shown = PAGE; renderList(); }, 180); });
+  $('q').addEventListener('input', (e) => { clearTimeout(qt); qt = setTimeout(() => { state.q = e.target.value.trim(); state.shown = PAGE; marcarDia(); renderList(); }, 180); });
   $('periodo').addEventListener('change', (e) => { state.periodo = e.target.value; state.shown = PAGE; renderList(); });
   $('tipo').addEventListener('change', (e) => { state.tipo = e.target.value; state.shown = PAGE; renderList(); });
   $('limpar').addEventListener('click', () => {
-    state.q = ''; state.day = ''; state.tipo = ''; state.periodo = ''; state.shown = PAGE;
+    state.q = ''; state.day = ''; state.autoDay = false; state.tipo = ''; state.periodo = ''; state.shown = PAGE;
     $('q').value = ''; $('periodo').value = ''; $('tipo').value = '';
     document.querySelectorAll('#days .chip').forEach((c) => c.setAttribute('aria-pressed', c.dataset.day === '' ? 'true' : 'false'));
     renderList();
@@ -689,10 +692,10 @@ footer.foot a { color: inherit; }
     const hoje = nowSP().d;
     const chipHoje = [...dbox.querySelectorAll('.chip')].find((c) => c.dataset.day === hoje);
     if (chipHoje) {
-      state.day = hoje; all.setAttribute('aria-pressed', 'false'); chipHoje.setAttribute('aria-pressed', 'true');
+      state.day = hoje; state.autoDay = true; all.setAttribute('aria-pressed', 'false'); chipHoje.setAttribute('aria-pressed', 'true');
       requestAnimationFrame(() => { dbox.scrollLeft = Math.max(0, chipHoje.offsetLeft - dbox.offsetLeft - 16); });
     }
-    dbox.addEventListener('click', (e) => { const c = e.target.closest('.chip'); if (!c) return; state.day = c.dataset.day; state.shown = PAGE; dbox.querySelectorAll('.chip').forEach((x) => x.setAttribute('aria-pressed', x === c ? 'true' : 'false')); renderList(); });
+    dbox.addEventListener('click', (e) => { const c = e.target.closest('.chip'); if (!c) return; state.day = c.dataset.day; state.autoDay = false; state.shown = PAGE; dbox.querySelectorAll('.chip').forEach((x) => x.setAttribute('aria-pressed', x === c ? 'true' : 'false')); renderList(); });
     const sel = $('tipo');
     CATS.forEach((ct) => { const n = DATA.filter((a) => a.c === ct.k).length; if (!n) return; const o = document.createElement('option'); o.value = ct.k; o.textContent = `${ct.label} (${n})`; sel.appendChild(o); });
   }
@@ -725,7 +728,7 @@ footer.foot a { color: inherit; }
           alvo = BYID.get(ev.toLowerCase().trim()) || null; alvoPerdido = !alvo;
           try { history.replaceState(null, '', location.pathname + '#programacao'); } catch (e) {}
           if (alvo) {
-            state.day = alvo.d;
+            state.day = alvo.d; state.autoDay = false;
             $('days').querySelectorAll('.chip').forEach((c) => c.setAttribute('aria-pressed', c.dataset.day === alvo.d ? 'true' : 'false'));
             const chip = $('days').querySelector(`.chip[data-day="${alvo.d}"]`);
             if (chip) requestAnimationFrame(() => { $('days').scrollLeft = Math.max(0, chip.offsetLeft - $('days').offsetLeft - 16); });
